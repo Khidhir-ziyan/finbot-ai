@@ -35,7 +35,7 @@ async def parse_with_gemini(text: str) -> dict:
             "contents": [{"parts": [{"text": PARSER_PROMPT + text}]}],
             "generationConfig": {"temperature": 0.3}
         }
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30) as client:
             response = await client.post(url, json=payload)
             data = response.json()
         
@@ -97,7 +97,7 @@ async def parse_with_mistral(text: str) -> dict:
             ],
             "temperature": 0.3
         }
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(trust_env=False, timeout=30) as client:
             response = await client.post(url, json=payload, headers=headers)
             data = response.json()
         

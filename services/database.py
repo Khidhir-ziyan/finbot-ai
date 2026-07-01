@@ -22,12 +22,12 @@ def save_transaction(jenis: str, kategori: str, nominal: int, keterangan: str, r
             "raw_text": raw_text,
             "created_at": datetime.now().isoformat()
         }
-        response = httpx.post(
-            f"{SUPABASE_URL}/rest/v1/cash_flow",
-            json=data,
-            headers=HEADERS,
-            timeout=10
-        )
+        with httpx.Client(trust_env=False, timeout=10) as client:
+            response = client.post(
+                f"{SUPABASE_URL}/rest/v1/cash_flow",
+                json=data,
+                headers=HEADERS
+            )
         response.raise_for_status()
         logger.info(f"Transaction saved: {response.json()}")
         return {"success": True, "data": response.json()}
@@ -37,12 +37,12 @@ def save_transaction(jenis: str, kategori: str, nominal: int, keterangan: str, r
 
 def get_transactions_by_date(date: str) -> list:
     try:
-        response = httpx.get(
-            f"{SUPABASE_URL}/rest/v1/cash_flow",
-            params=f"created_at=gte.{date}T00:00:00&created_at=lte.{date}T23:59:59&order=created_at.desc",
-            headers=HEADERS,
-            timeout=10
-        )
+        with httpx.Client(trust_env=False, timeout=10) as client:
+            response = client.get(
+                f"{SUPABASE_URL}/rest/v1/cash_flow",
+                params=f"created_at=gte.{date}T00:00:00&created_at=lte.{date}T23:59:59&order=created_at.desc",
+                headers=HEADERS
+            )
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -51,12 +51,12 @@ def get_transactions_by_date(date: str) -> list:
 
 def get_transactions_by_week(start_date: str, end_date: str) -> list:
     try:
-        response = httpx.get(
-            f"{SUPABASE_URL}/rest/v1/cash_flow",
-            params=f"created_at=gte.{start_date}T00:00:00&created_at=lte.{end_date}T23:59:59&order=created_at.desc",
-            headers=HEADERS,
-            timeout=10
-        )
+        with httpx.Client(trust_env=False, timeout=10) as client:
+            response = client.get(
+                f"{SUPABASE_URL}/rest/v1/cash_flow",
+                params=f"created_at=gte.{start_date}T00:00:00&created_at=lte.{end_date}T23:59:59&order=created_at.desc",
+                headers=HEADERS
+            )
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -65,12 +65,12 @@ def get_transactions_by_week(start_date: str, end_date: str) -> list:
 
 def get_all_transactions() -> list:
     try:
-        response = httpx.get(
-            f"{SUPABASE_URL}/rest/v1/cash_flow",
-            params="order=created_at.desc",
-            headers=HEADERS,
-            timeout=10
-        )
+        with httpx.Client(trust_env=False, timeout=10) as client:
+            response = client.get(
+                f"{SUPABASE_URL}/rest/v1/cash_flow",
+                params="order=created_at.desc",
+                headers=HEADERS
+            )
         response.raise_for_status()
         return response.json()
     except Exception as e:
