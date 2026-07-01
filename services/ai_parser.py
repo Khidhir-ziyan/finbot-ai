@@ -9,26 +9,36 @@ PARSER_PROMPT = """Anda adalah asisten keuangan yang menganalisis transaksi bisn
 Analisis teks berikut dan ekstrak data transaksi dalam format JSON:
 {
     "jenis": "Pemasukan" atau "Pengeluaran",
-    "kategori": "Fashion", "Makanan", "Minuman", "Operasional", "Dana Pribadi", "Kesehatan", "Transport", "Pendidikan", atau "Hiburan",
+    "kategori": "Fashion", "Makanan", "Minuman", "Operasional", "Dana Pribadi", "Kesehatan", "Transport", "Pendidikan", "Hiburan", atau "Olahraga",
     "nominal": angka murni tanpa format (contoh: 150000),
     "keterangan": deskripsi singkat transaksi
 }
 
 Aturan:
 1. "jenis" harus salah satu dari: Pemasukan, Pengeluaran
-2. "kategori" harus salah satu dari: Fashion, Makanan, Minuman, Operasional
+2. "kategori" harus salah satu dari: Fashion, Makanan, Minuman, Operasional, Dana Pribadi, Kesehatan, Transport, Pendidikan, Hiburan, Olahraga
 3. "nominal" harus berupa integer positif
-4. Jika teks tidak mengandung informasi keuangan yang valid, kembalikan: {"error": "Tidak dapat memparse transaksi"}
+4. Perhatikan KONTEKS transaksi untuk menentukan kategori yang tepat:
+   - "sepatu untuk olahraga" → Olahraga (bukan Fashion)
+   - "baju gym" → Olahraga
+   - "sepatu lari" → Olahraga
+   - "kaos hitam" → Fashion
+   - "nasi goreng" → Makanan
+   - "kopi" → Minuman
+   - "obat" → Kesehatan
+   - "grab" → Transport
+   - "kursus" → Pendidikan
+   - "nonton" → Hiburan
+   - "bayar listrik" → Operasional
+   - "dana pribadi" → Dana Pribadi
+5. Jika teks tidak mengandung informasi keuangan yang valid, kembalikan: {"error": "Tidak dapat memparse transaksi"}
 
 Contoh:
 - "Jual kaos hitam 3 pcs dapet 250rb" -> {"jenis": "Pemasukan", "kategori": "Fashion", "nominal": 250000, "keterangan": "Jual kaos hitam 3 pcs"}
-- "Beli bahan baku bumbu dapur abis 75000" -> {"jenis": "Pengeluaran", "kategori": "Makanan", "nominal": 75000, "keterangan": "Beli bahan baku bumbu dapur"}
+- "Beli sepatu untuk olahraga 200k" -> {"jenis": "Pengeluaran", "kategori": "Olahraga", "nominal": 200000, "keterangan": "Beli sepatu olahraga"}
 - "Bayar listrik bulanan 500rb" -> {"jenis": "Pengeluaran", "kategori": "Operasional", "nominal": 500000, "keterangan": "Bayar listrik bulanan"}
+- "Beli bahan kopi 60000" -> {"jenis": "Pengeluaran", "kategori": "Minuman", "nominal": 60000, "keterangan": "Beli bahan kopi"}
 - "Transfer dana pribadi 200rb" -> {"jenis": "Pengeluaran", "kategori": "Dana Pribadi", "nominal": 200000, "keterangan": "Transfer dana pribadi"}
-- "Bayar obat 50rb" -> {"jenis": "Pengeluaran", "kategori": "Kesehatan", "nominal": 50000, "keterangan": "Bayar obat"}
-- "Grab ke kantor 25rb" -> {"jenis": "Pengeluaran", "kategori": "Transport", "nominal": 25000, "keterangan": "Grab ke kantor"}
-- "Bayar kursus 500rb" -> {"jenis": "Pengeluaran", "kategori": "Pendidikan", "nominal": 500000, "keterangan": "Bayar kursus"}
-- "Nonton bioskop 75rb" -> {"jenis": "Pengeluaran", "kategori": "Hiburan", "nominal": 75000, "keterangan": "Nonton bioskop"}
 
 Teks: """
 

@@ -85,13 +85,17 @@ def is_budget_set(text):
     text = text.lower()
     patterns = [
         r"set\s+budget\s+",
+        r"tambah\s+budget\s+",
         r"budget\s+.*\d+",
         r"anggaran\s+",
         r"alokasi\s+",
     ]
     has_amount = bool(re.search(r"\d+", text))
-    has_kategori = any(k in text for k in ["set budget", "anggaran", "alokasi", "budget"])
+    has_kategori = any(k in text for k in ["set budget", "tambah budget", "anggaran", "alokasi", "budget"])
     return has_kategori and has_amount
+
+def is_budget_add(text):
+    return "tambah budget" in text.lower() or "add budget" in text.lower()
 
 def is_budget_check(text):
     text = text.lower()
@@ -122,6 +126,7 @@ async def handle_budget_set(chat_id: int, text: str):
     text_lower = text.lower()
     nominal = None
     kategori = None
+    is_add = "tambah" in text_lower or "add" in text_lower
 
     # Extract nominal
     amount_match = re.search(r"(\d+[\d\.]*)\s*(rb|k|jt|m|juta|ribu|ibu)?", text_lower)
@@ -136,7 +141,7 @@ async def handle_budget_set(chat_id: int, text: str):
 
     # If no known category found, try extracting from text
     if not kategori:
-        skip_words = ["set", "budget", "anggaran", "alokasi", "untuk", "dari", "ke", "tambah", "baru", "yaa", "dong"]
+        skip_words = ["set", "budget", "anggaran", "alokasi", "untuk", "dari", "ke", "tambah", "baru", "yaa", "dong", "add"]
         words = re.findall(r"[a-zA-Z]+", text_lower)
         for word in words:
             if word not in skip_words and not re.match(r"\d", word) and len(word) > 2:
@@ -144,15 +149,22 @@ async def handle_budget_set(chat_id: int, text: str):
                 break
 
     if not nominal:
-        await send_message(chat_id, "Contoh:\n- *set budget makanan 500rb*\n- *budget olahraga 300k*\n- *anggaran transport 200ribu*")
+        await send_message(chat_id, "Contoh:\n- *set budget makanan 500rb*\n- *tambah budget olahraga 200k*\n- *anggaran transport 200ribu*")
         return
 
     if not kategori:
         kategori = "Lainnya"
 
+    # If "tambah" mode, get existing budget and add
+    if is_add:
+        existing = await get_budget_by_kategori(kategori)
+        if existing:
+            nominal = existing["nominal"] + nominal
+
     result = await set_budget(kategori, nominal)
     if result["success"]:
-        await send_message(chat_id, f"✅ *Budget {kategori} berhasil diset!*\n\nBudget bulanan: {format_rp(nominal)}\n\nKetik *budget {kategori.lower()}* untuk cek sisa budget.")
+        action = "ditambah" if is_add else "diset"
+        await send_message(chat_id, f"✅ *Budget {kategori} berhasil {action}!*\n\nBudget bulanan: {format_rp(nominal)}\n\nKetik *budget {kategori.lower()}* untuk cek sisa budget.")
     else:
         await send_message(chat_id, "Gagal set budget. Coba lagi.")
 
