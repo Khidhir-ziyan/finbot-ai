@@ -31,6 +31,7 @@ application.add_handler(CommandHandler("today", handle_today))
 application.add_handler(CommandHandler("weekly", handle_weekly))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+@app.post("/api")
 @app.post("/")
 async def webhook(request: Request):
     try:
