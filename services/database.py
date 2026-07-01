@@ -74,13 +74,15 @@ async def get_all_transactions() -> list:
 
 async def set_budget(kategori: str, nominal: int) -> dict:
     try:
-        data = {"kategori": kategori, "nominal": nominal, "period": "bulanan"}
+        data = {"kategori": kategori, "nominal": int(nominal), "period": "bulanan"}
+        headers = {**HEADERS, "Prefer": "resolution=merge-duplicates,return=representation"}
         async with httpx.AsyncClient(trust_env=False, timeout=10, follow_redirects=True) as client:
             response = await client.post(
                 f"{SUPABASE_URL}/rest/v1/budgets",
                 json=data,
-                headers=HEADERS
+                headers=headers
             )
+        logger.info(f"Set budget response: {response.status_code} {response.text}")
         return {"success": True, "data": response.json()}
     except Exception as e:
         logger.error(f"Database error: {e}")

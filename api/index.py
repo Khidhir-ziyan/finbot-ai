@@ -184,12 +184,13 @@ async def handle_budget_check(chat_id: int, text: str):
         await send_message(chat_id, f"Belum ada budget untuk *{kategori}*.\n\nSet dengan: *set budget {kategori.lower()} 500rb*")
         return
 
+    budget_nominal = budget["nominal"]
+    logger.info(f"Budget raw: {budget}")
+
     now = datetime.now()
     month_start = now.replace(day=1).strftime("%Y-%m-%d")
     all_t = await get_all_transactions()
     spent = sum(t["nominal"] for t in all_t if t.get("kategori") == kategori and t.get("jenis") == "Pengeluaran" and t.get("created_at", "")[:10] >= month_start)
-
-    budget_nominal = budget["nominal"]
     sisa = budget_nominal - spent
     persen = (spent / budget_nominal * 100) if budget_nominal > 0 else 0
 
