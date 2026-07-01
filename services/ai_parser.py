@@ -31,7 +31,7 @@ async def parse_with_gemini(text: str) -> dict:
     try:
         import google.generativeai as genai
         genai.configure(api_key=AI_API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(PARSER_PROMPT + text)
         
         result_text = response.text.strip()
