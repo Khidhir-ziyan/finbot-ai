@@ -49,7 +49,7 @@ def format_rp(nominal):
     return f"Rp {nominal:,.0f}".replace(",", ".")
 
 def is_query(text):
-    keywords = ["berapa", "total", "ringkasan", "rekap", "laporan", "sisa", "selisih", "keuntungan", "lab", "rugi"]
+    keywords = ["berapa", "total", "ringkasan", "rekap", "laporan", "sisa", "selisih", "keuntungan", "lab", "rugi", "lihat", "liat", "cek", "show", "semua", "semuanya", "bulan", "minggu", "hari"]
     return any(k in text.lower() for k in keywords)
 
 async def send_message(chat_id: int, text: str):
