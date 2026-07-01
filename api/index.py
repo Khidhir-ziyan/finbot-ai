@@ -78,17 +78,36 @@ def parse_rp(text):
         return None
 
 def is_query(text):
-    keywords = ["berapa", "total", "ringkasan", "rekap", "laporan", "sisa", "selisih", "keuntungan", "lab", "rugi", "lihat", "liat", "cek", "show", "semua", "semuanya"]
+    keywords = ["berapa", "total", "ringkasan", "rekap", "laporan", "sisa", "selisih", "keuntungan", "lab", "rugi", "lihat", "liat", "cek", "show", "semua", "semuanya", "tampilkan", "kasih tau", "info", "status", "posisi"]
     return any(k in text.lower() for k in keywords)
 
 def is_budget_set(text):
-    return re.match(r"(set\s+)?budget\s+(\w+)\s+(\d+)", text.lower()) is not None
+    text = text.lower()
+    patterns = [
+        r"set\s+budget\s+",
+        r"budget\s+.*\d+",
+        r"anggaran\s+",
+        r"alokasi\s+",
+    ]
+    has_amount = bool(re.search(r"\d+", text))
+    has_kategori = any(k in text for k in ["set budget", "anggaran", "alokasi", "budget"])
+    return has_kategori and has_amount
 
 def is_budget_check(text):
-    return re.match(r"budget\s+(\w+)", text.lower()) is not None and "set" not in text.lower() and "hapus" not in text.lower()
+    text = text.lower()
+    if "set" in text or "hapus" in text:
+        return False
+    patterns = [
+        r"^budget\s+\w+$",
+        r"sisa\s+budget",
+        r"cek\s+budget",
+        r"berapa\s+budget",
+        r"budget\s+(saya|ku|gw)",
+    ]
+    return any(re.search(p, text) for p in patterns)
 
 def is_budget_delete(text):
-    return "hapus budget" in text.lower()
+    return any(k in text.lower() for k in ["hapus budget", "hapus anggaran", "remove budget", "delete budget"])
 
 def is_analisis(text):
     return any(k in text.lower() for k in ["analisis", "analisa", "rekomendasi", "saran", "tips", "strategy", "strategi"])
@@ -100,31 +119,64 @@ async def send_message(chat_id: int, text: str):
         await bot.send_message(chat_id=chat_id, text=text)
 
 async def handle_budget_set(chat_id: int, text: str):
-    match = re.search(r"budget\s+(\w+)\s+(\d+)", text.lower())
-    if not match:
-        await send_message(chat_id, "Format: *set budget makanan 500rb*")
-        return
+    text_lower = text.lower()
+    nominal = None
+    kategori = None
 
-    kategori = match.group(1).capitalize()
-    nominal = parse_rp(match.group(2))
+    # Extract nominal
+    amount_match = re.search(r"(\d+[\d\.]*)\s*(rb|k|jt|m|juta|ribu|ibu)?", text_lower)
+    if amount_match:
+        nominal = parse_rp(amount_match.group(0))
+
+    # Extract kategori
+    for cat in CATEGORIES:
+        if cat.lower() in text_lower:
+            kategori = cat
+            break
+
+    if not kategori:
+        # Try to find any word that looks like a category
+        words = text_lower.split()
+        for word in words:
+            if word not in ["set", "budget", "anggaran", "alokasi", "untuk", "dari", "ke"] and not re.match(r"\d", word):
+                kategori = word.capitalize()
+                break
 
     if not nominal:
-        await send_message(chat_id, "Nominal tidak valid.")
+        await send_message(chat_id, "Contoh:\n- *set budget makanan 500rb*\n- *budget olahraga 300k*\n- *anggaran transport 200ribu*")
         return
+
+    if not kategori:
+        kategori = "Lainnya"
 
     result = await set_budget(kategori, nominal)
     if result["success"]:
-        await send_message(chat_id, f"✅ *Budget {kategori} berhasil diset!*\n\nBudget bulanan: {format_rp(nominal)}")
+        await send_message(chat_id, f"✅ *Budget {kategori} berhasil diset!*\n\nBudget bulanan: {format_rp(nominal)}\n\nKetik *budget {kategori.lower()}* untuk cek sisa budget.")
     else:
         await send_message(chat_id, "Gagal set budget. Coba lagi.")
 
 async def handle_budget_check(chat_id: int, text: str):
-    match = re.search(r"budget\s+(\w+)", text.lower())
-    if not match:
-        await send_message(chat_id, "Format: *budget makanan*")
+    text_lower = text.lower()
+    kategori = None
+
+    # Extract kategori
+    for cat in CATEGORIES:
+        if cat.lower() in text_lower:
+            kategori = cat
+            break
+
+    if not kategori:
+        # Try to find any word that looks like a category
+        words = text_lower.split()
+        for word in words:
+            if word not in ["budget", "sisa", "cek", "berapa", "saya", "ku", "gw", "untuk", "dari", "ke"] and not re.match(r"\d", word):
+                kategori = word.capitalize()
+                break
+
+    if not kategori:
+        await send_message(chat_id, "Contoh:\n- *budget makanan*\n- *sisa budget transport*\n- *berapa budget hiburan*")
         return
 
-    kategori = match.group(1).capitalize()
     budget = await get_budget_by_kategori(kategori)
 
     if not budget:
@@ -140,13 +192,18 @@ async def handle_budget_check(chat_id: int, text: str):
     sisa = budget_nominal - spent
     persen = (spent / budget_nominal * 100) if budget_nominal > 0 else 0
 
+    bar_len = 10
+    filled = int(persen / 100 * bar_len)
+    bar = "█" * filled + "░" * (bar_len - filled)
+
     status = "✅ Aman" if persen < 80 else "⚠️ Hati-hati" if persen < 100 else "🚨 Overbudget!"
 
     summary = f"*Budget {kategori} - {now.strftime('%B %Y')}*\n\n"
     summary += f"*Budget:* {format_rp(budget_nominal)}\n"
     summary += f"*Terpakai:* {format_rp(spent)} ({persen:.0f}%)\n"
     summary += f"*Sisa:* {format_rp(sisa)}\n"
-    summary += f"*Status:* {status}"
+    summary += f"*Status:* {status}\n"
+    summary += f"[{bar}]"
 
     await send_message(chat_id, summary)
 
