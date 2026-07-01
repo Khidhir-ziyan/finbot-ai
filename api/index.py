@@ -31,7 +31,7 @@ application.add_handler(CommandHandler("today", handle_today))
 application.add_handler(CommandHandler("weekly", handle_weekly))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-@app.post("/api")
+@app.post("/")
 async def webhook(request: Request):
     try:
         await application.initialize()
@@ -56,7 +56,7 @@ async def webhook(request: Request):
         logger.error(f"Webhook error: {e}")
         return Response(status_code=500)
 
-@app.get("/api")
+@app.get("/health")
 async def health():
     return {"status": "healthy", "service": "FinBot-AI"}
 
