@@ -1,10 +1,10 @@
 import os
 import sys
 import logging
+import re
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# Clear proxy env vars BEFORE any imports
 for var in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"]:
     os.environ.pop(var, None)
 
@@ -24,28 +24,99 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 bot = Bot(token=TELEGRAM_TOKEN)
 
-HELP_TEXT = """FinBot-AI - Asisten Keuangan
+HELP_TEXT = """*FinBot-AI* - Asisten Keuangan Pintar
 
-Cara menggunakan:
-- Kirim pesan untuk mencatat transaksi
-- Contoh: 'Jual kaos hitam 3 pcs dapet 250rb'
-- Contoh: 'Beli bahan baku abis 75000'
+*Cara mencatat transaksi:*
+Kirim pesan natural, contoh:
+- *Jual kaos hitam 3 pcs dapet 250rb*
+- *Beli bahan kopi 60000*
+- *Bayar listrik 350rb*
+- *Utang client 500rb*
 
-Perintah:
-/help - Tampilkan bantuan ini
-/today - Ringkasan transaksi hari ini
-/weekly - Ringkasan transaksi minggu ini
-/summary - Ringkasan semua transaksi"""
+*Perintah:*
+/help - Bantuan
+/today - Ringkasan hari ini
+/weekly - Ringkasan minggu ini
+/summary - Semua transaksi
+
+*Query natural:*
+- *berapa total* - Total semua transaksi
+- *total hari ini* - Total hari ini
+- *pengeluaran minggu ini* - Total pengeluaran minggu ini
+- *pemasukan bulan ini* - Total pemasukan bulan ini"""
+
+def format_rp(nominal):
+    return f"Rp {nominal:,.0f}".replace(",", ".")
+
+def is_query(text):
+    keywords = ["berapa", "total", "ringkasan", "rekap", "laporan", "sisa", "selisih", "keuntungan", "lab", "rugi"]
+    return any(k in text.lower() for k in keywords)
 
 async def send_message(chat_id: int, text: str):
-    await bot.send_message(chat_id=chat_id, text=text)
+    await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+
+async def handle_query(chat_id: int, text: str):
+    today = datetime.now()
+    today_str = today.strftime("%Y-%m-%d")
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    month_start = today.replace(day=1)
+    month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+    text_lower = text.lower()
+
+    if "hari ini" in text_lower or "today" in text_lower:
+        transactions = await get_transactions_by_date(today_str)
+        label = "Hari Ini"
+    elif "minggu" in text_lower or "week" in text_lower:
+        transactions = await get_transactions_by_week(week_start.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d"))
+        label = "Minggu Ini"
+    elif "bulan" in text_lower or "month" in text_lower:
+        all_t = await get_all_transactions()
+        transactions = [t for t in all_t if month_start.strftime("%Y-%m-%d") <= (t.get("created_at", "")[:10]) <= month_end.strftime("%Y-%m-%d")]
+        label = "Bulan Ini"
+    else:
+        transactions = await get_all_transactions()
+        label = "Semua"
+
+    if not transactions:
+        await send_message(chat_id, f"Tidak ada transaksi *{label.lower()}*.")
+        return
+
+    total_pemasukan = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pemasukan")
+    total_pengeluaran = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pengeluaran")
+    selisih = total_pemasukan - total_pengeluaran
+    status = "Untung" if selisih >= 0 else "Rugi"
+
+    # Count by category
+    kategori_stats = {}
+    for t in transactions:
+        k = t.get("kategori", "Lainnya")
+        if k not in kategori_stats:
+            kategori_stats[k] = {"Pemasukan": 0, "Pengeluaran": 0}
+        kategori_stats[k][t.get("jenis", "")] += t.get("nominal", 0)
+
+    summary = f"*Rekap Keuangan - {label}*\n"
+    summary += f"{'='*25}\n\n"
+    summary += f"*Pemasukan:* {format_rp(total_pemasukan)}\n"
+    summary += f"*Pengeluaran:* {format_rp(total_pengeluaran)}\n"
+    summary += f"*{status}:* {format_rp(abs(selisih))}\n"
+    summary += f"*Jumlah Transaksi:* {len(transactions)}\n"
+
+    if kategori_stats:
+        summary += f"\n*Per Kategori:*\n"
+        for k, v in kategori_stats.items():
+            total = v["Pemasukan"] - v["Pengeluaran"]
+            summary += f"- {k}: {format_rp(abs(total))} {'+' if total >= 0 else '-'}\n"
+
+    await send_message(chat_id, summary)
 
 async def process_message(chat_id: int, text: str):
     try:
         parsed = await parse_transaction(text)
 
         if "error" in parsed:
-            await send_message(chat_id, f"Error: {parsed['error']}\n\nContoh:\n- 'Jual kaos hitam 3 pcs dapet 250rb'\n- 'Beli bahan baku abis 75000'")
+            await send_message(chat_id, f"⚠️ *Error:* {parsed['error']}\n\nContoh:\n- *Jual kaos hitam 3 pcs dapet 250rb*\n- *Beli bahan baku abis 75000*")
             return
 
         result = await save_transaction(
@@ -57,12 +128,13 @@ async def process_message(chat_id: int, text: str):
         )
 
         if result["success"]:
+            emoji = "📈" if parsed["jenis"] == "Pemasukan" else "📉"
             confirmation = (
-                f"Transaksi berhasil dicatat!\n\n"
-                f"Jenis: {parsed['jenis']}\n"
-                f"Kategori: {parsed['kategori']}\n"
-                f"Nominal: Rp {parsed['nominal']:,.0f}\n"
-                f"Keterangan: {parsed['keterangan']}"
+                f"{emoji} *Transaksi Tercatat!*\n\n"
+                f"*Jenis:* {parsed['jenis']}\n"
+                f"*Kategori:* {parsed['kategori']}\n"
+                f"*Nominal:* {format_rp(parsed['nominal'])}\n"
+                f"*Keterangan:* {parsed['keterangan']}"
             )
             await send_message(chat_id, confirmation)
         else:
@@ -72,19 +144,20 @@ async def process_message(chat_id: int, text: str):
         await send_message(chat_id, "Terjadi kesalahan. Coba lagi nanti.")
 
 async def handle_today(chat_id: int):
-    today = datetime.now().strftime("%Y-%m-%d")
-    transactions = await get_transactions_by_date(today)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    transactions = await get_transactions_by_date(today_str)
     if not transactions:
         await send_message(chat_id, "Tidak ada transaksi hari ini.")
         return
-    total_pemasukan = sum(t["nominal"] for t in transactions if t["jenis"] == "Pemasukan")
-    total_pengeluaran = sum(t["nominal"] for t in transactions if t["jenis"] == "Pengeluaran")
-    summary = f"Ringkasan {today}:\n\n"
-    summary += f"Pemasukan: Rp {total_pemasukan:,.0f}\n"
-    summary += f"Pengeluaran: Rp {total_pengeluaran:,.0f}\n"
-    summary += f"Selisih: Rp {total_pemasukan - total_pengeluaran:,.0f}\n\n"
+    total_pemasukan = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pemasukan")
+    total_pengeluaran = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pengeluaran")
+    summary = f"*Ringkasan {today_str}*\n\n"
+    summary += f"*Pemasukan:* {format_rp(total_pemasukan)}\n"
+    summary += f"*Pengeluaran:* {format_rp(total_pengeluaran)}\n"
+    summary += f"*Selisih:* {format_rp(total_pemasukan - total_pengeluaran)}\n\n"
     for t in transactions:
-        summary += f"- {t['keterangan']} (Rp {t['nominal']:,.0f})\n"
+        emoji = "+" if t.get("jenis") == "Pemasukan" else "-"
+        summary += f"- {t.get('keterangan', '')} ({format_rp(t.get('nominal', 0))}) {emoji}\n"
     await send_message(chat_id, summary)
 
 async def handle_weekly(chat_id: int):
@@ -95,13 +168,13 @@ async def handle_weekly(chat_id: int):
     if not transactions:
         await send_message(chat_id, "Tidak ada transaksi minggu ini.")
         return
-    total_pemasukan = sum(t["nominal"] for t in transactions if t["jenis"] == "Pemasukan")
-    total_pengeluaran = sum(t["nominal"] for t in transactions if t["jenis"] == "Pengeluaran")
-    summary = f"Ringkasan Mingguan:\n\n"
-    summary += f"Pemasukan: Rp {total_pemasukan:,.0f}\n"
-    summary += f"Pengeluaran: Rp {total_pengeluaran:,.0f}\n"
-    summary += f"Selisih: Rp {total_pemasukan - total_pengeluaran:,.0f}\n"
-    summary += f"Jumlah: {len(transactions)} transaksi"
+    total_pemasukan = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pemasukan")
+    total_pengeluaran = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pengeluaran")
+    summary = f"*Ringkasan Mingguan*\n{week_start.strftime('%d %b')} - {week_end.strftime('%d %b %Y')}\n\n"
+    summary += f"*Pemasukan:* {format_rp(total_pemasukan)}\n"
+    summary += f"*Pengeluaran:* {format_rp(total_pengeluaran)}\n"
+    summary += f"*Selisih:* {format_rp(total_pemasukan - total_pengeluaran)}\n"
+    summary += f"*Transaksi:* {len(transactions)}"
     await send_message(chat_id, summary)
 
 async def handle_summary(chat_id: int):
@@ -109,13 +182,13 @@ async def handle_summary(chat_id: int):
     if not transactions:
         await send_message(chat_id, "Belum ada transaksi.")
         return
-    total_pemasukan = sum(t["nominal"] for t in transactions if t["jenis"] == "Pemasukan")
-    total_pengeluaran = sum(t["nominal"] for t in transactions if t["jenis"] == "Pengeluaran")
-    summary = f"Ringkasan Semua:\n\n"
-    summary += f"Pemasukan: Rp {total_pemasukan:,.0f}\n"
-    summary += f"Pengeluaran: Rp {total_pengeluaran:,.0f}\n"
-    summary += f"Selisih: Rp {total_pemasukan - total_pengeluaran:,.0f}\n"
-    summary += f"Jumlah: {len(transactions)} transaksi"
+    total_pemasukan = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pemasukan")
+    total_pengeluaran = sum(t["nominal"] for t in transactions if t.get("jenis") == "Pengeluaran")
+    summary = f"*Ringkasan Semua Transaksi*\n\n"
+    summary += f"*Pemasukan:* {format_rp(total_pemasukan)}\n"
+    summary += f"*Pengeluaran:* {format_rp(total_pengeluaran)}\n"
+    summary += f"*Selisih:* {format_rp(total_pemasukan - total_pengeluaran)}\n"
+    summary += f"*Total Transaksi:* {len(transactions)}"
     await send_message(chat_id, summary)
 
 @app.api_route("/{path:path}", methods=["GET", "POST"])
@@ -147,6 +220,8 @@ async def handler(request: Request, path: str = ""):
                     await handle_weekly(chat_id)
                 elif text == "/summary":
                     await handle_summary(chat_id)
+                elif is_query(text):
+                    await handle_query(chat_id, text)
                 else:
                     await process_message(chat_id, text)
 
