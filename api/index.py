@@ -4,6 +4,10 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 
+# Clear proxy env vars BEFORE any imports
+for var in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"]:
+    os.environ.pop(var, None)
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, Request

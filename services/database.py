@@ -8,6 +8,17 @@ from config import SUPABASE_URL, SUPABASE_KEY
 
 logger = logging.getLogger(__name__)
 
+logger.info(f"SUPABASE_URL set: {bool(SUPABASE_URL)}")
+logger.info(f"SUPABASE_KEY set: {bool(SUPABASE_KEY)}")
+
+# Disable proxy env vars
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+os.environ.pop("ALL_PROXY", None)
+os.environ.pop("all_proxy", None)
+
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -21,9 +32,6 @@ def _request(method: str, url: str, data: dict = None, params: str = "") -> dict
     
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=HEADERS, method=method)
-    
-    # Disable proxy from env
-    https_handler = urllib.request.HTTPSHandler()
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     
     with opener.open(req, timeout=10) as resp:
