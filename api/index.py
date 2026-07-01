@@ -67,9 +67,9 @@ def parse_rp(text):
     multipliers = {"rb": 1000, "jt": 1000000, "k": 1000, "m": 1000000, "juta": 1000000, "ribu": 1000, "ibu": 1000}
     for suffix, mult in multipliers.items():
         if text.endswith(suffix):
-            text = text[:-len(suffix)].strip()
+            num_part = text[:-len(suffix)].strip()
             try:
-                return int(float(text) * mult)
+                return int(float(num_part) * mult)
             except ValueError:
                 return None
     try:
@@ -128,17 +128,18 @@ async def handle_budget_set(chat_id: int, text: str):
     if amount_match:
         nominal = parse_rp(amount_match.group(0))
 
-    # Extract kategori
+    # First try to match against known categories
     for cat in CATEGORIES:
         if cat.lower() in text_lower:
             kategori = cat
             break
 
+    # If no known category found, try extracting from text
     if not kategori:
-        # Try to find any word that looks like a category
-        words = text_lower.split()
+        skip_words = ["set", "budget", "anggaran", "alokasi", "untuk", "dari", "ke", "tambah", "baru", "yaa", "dong"]
+        words = re.findall(r"[a-zA-Z]+", text_lower)
         for word in words:
-            if word not in ["set", "budget", "anggaran", "alokasi", "untuk", "dari", "ke"] and not re.match(r"\d", word):
+            if word not in skip_words and not re.match(r"\d", word) and len(word) > 2:
                 kategori = word.capitalize()
                 break
 
