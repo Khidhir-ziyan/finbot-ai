@@ -71,3 +71,43 @@ async def get_all_transactions() -> list:
     except Exception as e:
         logger.error(f"Database error: {e}")
         return []
+
+async def set_budget(kategori: str, nominal: int) -> dict:
+    try:
+        data = {"kategori": kategori, "nominal": nominal, "period": "bulanan"}
+        async with httpx.AsyncClient(trust_env=False, timeout=10, follow_redirects=True) as client:
+            response = await client.post(
+                f"{SUPABASE_URL}/rest/v1/budgets",
+                json=data,
+                headers=HEADERS
+            )
+        return {"success": True, "data": response.json()}
+    except Exception as e:
+        logger.error(f"Database error: {e}")
+        return {"success": False, "error": str(e)}
+
+async def get_all_budgets() -> list:
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10, follow_redirects=True) as client:
+            response = await client.get(
+                f"{SUPABASE_URL}/rest/v1/budgets",
+                headers=HEADERS
+            )
+        return response.json()
+    except Exception as e:
+        logger.error(f"Database error: {e}")
+        return []
+
+async def get_budget_by_kategori(kategori: str) -> dict:
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=10, follow_redirects=True) as client:
+            response = await client.get(
+                f"{SUPABASE_URL}/rest/v1/budgets",
+                headers=HEADERS,
+                params={"kategori": f"eq.{kategori}"}
+            )
+        results = response.json()
+        return results[0] if results else None
+    except Exception as e:
+        logger.error(f"Database error: {e}")
+        return None
