@@ -81,11 +81,50 @@ async def parse_with_openai(text: str) -> dict:
         logger.error(f"OpenAI API error: {e}")
         return {"error": "Gagal memproses dengan AI"}
 
+async def parse_with_mistral(text: str) -> dict:
+    try:
+        import httpx
+        url = "https://api.mistral.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {AI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "mistral-small-latest",
+            "messages": [
+                {"role": "system", "content": "Anda adalah asisten keuangan yang menganalisis transaksi bisnis. Balas HANYA dengan JSON, tanpa teks lain."},
+                {"role": "user", "content": PARSER_PROMPT + text}
+            ],
+            "temperature": 0.3
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            data = response.json()
+        
+        logger.info(f"Mistral response: {data}")
+        
+        if "choices" not in data:
+            logger.error(f"Mistral error: {data}")
+            return {"error": f"AI error: {data.get('message', 'Unknown')}"}
+        
+        result_text = data["choices"][0]["message"]["content"].strip()
+        if result_text.startswith("```json"):
+            result_text = result_text[7:-3]
+        elif result_text.startswith("```"):
+            result_text = result_text[3:-3]
+        
+        return json.loads(result_text)
+    except Exception as e:
+        logger.error(f"Mistral API error: {e}")
+        return {"error": "Gagal memproses dengan AI"}
+
 async def parse_transaction(text: str) -> dict:
     if AI_PROVIDER == "gemini":
         result = await parse_with_gemini(text)
     elif AI_PROVIDER == "openai":
         result = await parse_with_openai(text)
+    elif AI_PROVIDER == "mistral":
+        result = await parse_with_mistral(text)
     else:
         return {"error": "AI provider tidak valid"}
     
