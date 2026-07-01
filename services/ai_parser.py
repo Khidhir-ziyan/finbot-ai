@@ -32,11 +32,18 @@ async def parse_with_gemini(text: str) -> dict:
         import httpx
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={AI_API_KEY}"
         payload = {
-            "contents": [{"parts": [{"text": PARSER_PROMPT + text}]}]
+            "contents": [{"parts": [{"text": PARSER_PROMPT + text}]}],
+            "generationConfig": {"temperature": 0.3}
         }
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(url, json=payload)
             data = response.json()
+        
+        logger.info(f"Gemini response: {data}")
+        
+        if "candidates" not in data:
+            logger.error(f"Gemini error: {data}")
+            return {"error": f"AI error: {data.get('error', {}).get('message', 'Unknown')}"}
         
         result_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         if result_text.startswith("```json"):
