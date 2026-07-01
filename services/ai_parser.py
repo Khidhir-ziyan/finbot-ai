@@ -29,12 +29,16 @@ Teks: """
 
 async def parse_with_gemini(text: str) -> dict:
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=AI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(PARSER_PROMPT + text)
+        import httpx
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={AI_API_KEY}"
+        payload = {
+            "contents": [{"parts": [{"text": PARSER_PROMPT + text}]}]
+        }
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(url, json=payload)
+            data = response.json()
         
-        result_text = response.text.strip()
+        result_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         if result_text.startswith("```json"):
             result_text = result_text[7:-3]
         elif result_text.startswith("```"):
