@@ -9,7 +9,7 @@ PARSER_PROMPT = """Anda adalah asisten keuangan yang menganalisis transaksi bisn
 Analisis teks berikut dan ekstrak data transaksi dalam format JSON:
 {
     "jenis": "Pemasukan" atau "Pengeluaran",
-    "kategori": "Fashion", "Makanan", "Minuman", atau "Operasional",
+    "kategori": "Fashion", "Makanan", "Minuman", "Operasional", "Dana Pribadi", "Kesehatan", "Transport", "Pendidikan", atau "Hiburan",
     "nominal": angka murni tanpa format (contoh: 150000),
     "keterangan": deskripsi singkat transaksi
 }
@@ -24,6 +24,11 @@ Contoh:
 - "Jual kaos hitam 3 pcs dapet 250rb" -> {"jenis": "Pemasukan", "kategori": "Fashion", "nominal": 250000, "keterangan": "Jual kaos hitam 3 pcs"}
 - "Beli bahan baku bumbu dapur abis 75000" -> {"jenis": "Pengeluaran", "kategori": "Makanan", "nominal": 75000, "keterangan": "Beli bahan baku bumbu dapur"}
 - "Bayar listrik bulanan 500rb" -> {"jenis": "Pengeluaran", "kategori": "Operasional", "nominal": 500000, "keterangan": "Bayar listrik bulanan"}
+- "Transfer dana pribadi 200rb" -> {"jenis": "Pengeluaran", "kategori": "Dana Pribadi", "nominal": 200000, "keterangan": "Transfer dana pribadi"}
+- "Bayar obat 50rb" -> {"jenis": "Pengeluaran", "kategori": "Kesehatan", "nominal": 50000, "keterangan": "Bayar obat"}
+- "Grab ke kantor 25rb" -> {"jenis": "Pengeluaran", "kategori": "Transport", "nominal": 25000, "keterangan": "Grab ke kantor"}
+- "Bayar kursus 500rb" -> {"jenis": "Pengeluaran", "kategori": "Pendidikan", "nominal": 500000, "keterangan": "Bayar kursus"}
+- "Nonton bioskop 75rb" -> {"jenis": "Pengeluaran", "kategori": "Hiburan", "nominal": 75000, "keterangan": "Nonton bioskop"}
 
 Teks: """
 

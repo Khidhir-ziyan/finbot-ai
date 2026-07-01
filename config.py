@@ -7,5 +7,5 @@ AI_API_KEY = os.getenv("AI_API_KEY")
 AUTHORIZED_SENDER_ID = int(os.getenv("AUTHORIZED_SENDER_ID", "0"))
 AI_PROVIDER = os.getenv("AI_PROVIDER", "mistral")
 
-CATEGORIES = ["Fashion", "Makanan", "Minuman", "Operasional"]
+CATEGORIES = ["Fashion", "Makanan", "Minuman", "Operasional", "Dana Pribadi", "Kesehatan", "Transport", "Pendidikan", "Hiburan"]
 JENIS_OPTIONS = ["Pemasukan", "Pengeluaran"]
