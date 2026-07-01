@@ -48,7 +48,7 @@ async def process_message(chat_id: int, text: str):
             await send_message(chat_id, f"Error: {parsed['error']}\n\nContoh:\n- 'Jual kaos hitam 3 pcs dapet 250rb'\n- 'Beli bahan baku abis 75000'")
             return
 
-        result = save_transaction(
+        result = await save_transaction(
             jenis=parsed["jenis"],
             kategori=parsed["kategori"],
             nominal=parsed["nominal"],
@@ -73,7 +73,7 @@ async def process_message(chat_id: int, text: str):
 
 async def handle_today(chat_id: int):
     today = datetime.now().strftime("%Y-%m-%d")
-    transactions = get_transactions_by_date(today)
+    transactions = await get_transactions_by_date(today)
     if not transactions:
         await send_message(chat_id, "Tidak ada transaksi hari ini.")
         return
@@ -91,7 +91,7 @@ async def handle_weekly(chat_id: int):
     today = datetime.now()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
-    transactions = get_transactions_by_week(week_start.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d"))
+    transactions = await get_transactions_by_week(week_start.strftime("%Y-%m-%d"), week_end.strftime("%Y-%m-%d"))
     if not transactions:
         await send_message(chat_id, "Tidak ada transaksi minggu ini.")
         return
@@ -105,7 +105,7 @@ async def handle_weekly(chat_id: int):
     await send_message(chat_id, summary)
 
 async def handle_summary(chat_id: int):
-    transactions = get_all_transactions()
+    transactions = await get_all_transactions()
     if not transactions:
         await send_message(chat_id, "Belum ada transaksi.")
         return
